@@ -1,7 +1,10 @@
 import mongoose from "mongoose";
 import { Worker } from "bullmq";
 import { connectDB } from "../lib/db";
-import { redisConnection } from "../lib/queue";
+
+// CHANGE THIS IMPORT PATH IF NEEDED
+// Search for: export const redisConnection
+import { redisConnection } from "../config/redis";
 
 interface GenerationJobPayload {
   userId?: string;
@@ -13,7 +16,7 @@ interface GenerationJobPayload {
 }
 
 // =======================================================
-// Worker Logic
+// Assignment Generation Logic
 // =======================================================
 async function processAssignmentGeneration(
   job: { data: GenerationJobPayload }
@@ -28,67 +31,53 @@ async function processAssignmentGeneration(
   } = job.data;
 
   console.log(
-    `🚀 Processing Assignment: ${
-      additionalInfo ||
-      "Untitled"
+    `🚀 [WORKER START] Processing assignment: ${
+      additionalInfo || "Untitled"
     }`
   );
 
   await connectDB();
 
   try {
-    const generatedQuestions =
-      Array.from(
-        {
-          length:
-            numberOfQuestions,
-        },
-        (_, i) => ({
-          questionId: `q${
-            i + 1
-          }`,
-          text: `Question ${
-            i + 1
-          }: ${
-            additionalInfo ||
-            "General Topic"
-          }`,
-          type:
-            "subjective",
-          points:
-            Math.round(
-              marks /
-                numberOfQuestions
-            ) || 5,
-        })
-      );
+    const generatedQuestions = Array.from(
+      { length: numberOfQuestions || 1 },
+      (_, index) => ({
+        questionId: `q${index + 1}`,
+        text: `Question ${index + 1}: ${
+          additionalInfo || "General Topic"
+        }`,
+        type: "subjective",
+        points:
+          Math.round(
+            marks / numberOfQuestions
+          ) || 5,
+      })
+    );
 
-    const assignmentPayload =
-      {
-        userId:
-          userId || null,
-        createdBy:
-          createdBy ||
-          "Aryan Panwar",
-        creatorEmail:
-          creatorEmail ||
-          "",
-        additionalInfo:
-          additionalInfo,
-        status:
-          "completed",
-        createdAt:
-          new Date(),
-        config: {
-          numberOfQuestions,
-          marks,
-          dueDate:
-            "Inline Generation",
-        },
-        questions:
-          generatedQuestions,
-      };
+    const assignmentPayload = {
+      userId: userId || null,
+      createdBy:
+        createdBy || "Aryan Panwar",
+      creatorEmail:
+        creatorEmail || "",
+      additionalInfo:
+        additionalInfo ||
+        "Generated Assignment",
+      status: "completed",
+      createdAt: new Date(),
 
+      config: {
+        numberOfQuestions,
+        marks,
+        dueDate:
+          "Inline Generation",
+      },
+
+      questions:
+        generatedQuestions,
+    };
+
+    // Save to Mongo
     if (
       mongoose.connection
         .readyState >= 1
@@ -106,16 +95,23 @@ async function processAssignmentGeneration(
           )
         );
 
-      const saved =
+      const savedDocument =
         await AssignmentModel.create(
           assignmentPayload
         );
 
       console.log(
-        "✅ Assignment Saved:",
-        saved._id
+        `✅ Assignment saved: ${savedDocument._id}`
+      );
+    } else {
+      console.warn(
+        "⚠️ Mongo not connected"
       );
     }
+
+    console.log(
+      "📡 Generation complete"
+    );
 
     return {
       success: true,
@@ -124,7 +120,7 @@ async function processAssignmentGeneration(
     };
   } catch (error) {
     console.error(
-      "❌ Worker failed:",
+      "❌ Worker crashed:",
       error
     );
 
@@ -133,9 +129,9 @@ async function processAssignmentGeneration(
 }
 
 // =======================================================
-// ACTUAL BULLMQ WORKER
+// BullMQ Worker Instance
 // =======================================================
-new Worker(
+const worker = new Worker(
   "assignment-generation",
   async (job) => {
     return processAssignmentGeneration(
@@ -145,6 +141,25 @@ new Worker(
   {
     connection:
       redisConnection,
+  }
+);
+
+worker.on(
+  "completed",
+  (job) => {
+    console.log(
+      `✅ Job completed: ${job.id}`
+    );
+  }
+);
+
+worker.on(
+  "failed",
+  (job, err) => {
+    console.error(
+      `❌ Job failed: ${job?.id}`,
+      err
+    );
   }
 );
 
