@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
+import { Worker } from "bullmq";
 import { connectDB } from "../lib/db";
-// Assuming standard layout allocations for your mongoose schemas and configuration libraries
-// import { Assignment } from "../models/Assignment"; 
+import { redisConnection } from "../lib/queue";
 
 interface GenerationJobPayload {
   userId?: string;
@@ -12,84 +12,142 @@ interface GenerationJobPayload {
   additionalInfo: string;
 }
 
-/**
- * Main worker pipeline handler execution loop.
- * Integrates directly into your Redis/BullMQ task processor runtime.
- */
-export async function processAssignmentGeneration(job: { data: GenerationJobPayload }) {
-  const { numberOfQuestions, marks, additionalInfo, userId, createdBy, creatorEmail } = job.data;
-  
-  console.log(`🚀 [WORKER START]: Processing job queue token for template: "${additionalInfo || "Untitled Assessment"}"`);
+// =======================================================
+// Worker Logic
+// =======================================================
+async function processAssignmentGeneration(
+  job: { data: GenerationJobPayload }
+) {
+  const {
+    numberOfQuestions,
+    marks,
+    additionalInfo,
+    userId,
+    createdBy,
+    creatorEmail,
+  } = job.data;
 
-  // Ensure database lookup status maps are initialized
+  console.log(
+    `🚀 Processing Assignment: ${
+      additionalInfo ||
+      "Untitled"
+    }`
+  );
+
   await connectDB();
 
   try {
-    // =========================================================================
-    // AI ENGINE CORE INFERENCE BLOCK (Groq Pipeline Execution)
-    // =========================================================================
-    // This mocks the generation layout payload compiled from your live Groq API output channel
-    const generatedQuestionsMock = [
+    const generatedQuestions =
+      Array.from(
+        {
+          length:
+            numberOfQuestions,
+        },
+        (_, i) => ({
+          questionId: `q${
+            i + 1
+          }`,
+          text: `Question ${
+            i + 1
+          }: ${
+            additionalInfo ||
+            "General Topic"
+          }`,
+          type:
+            "subjective",
+          points:
+            Math.round(
+              marks /
+                numberOfQuestions
+            ) || 5,
+        })
+      );
+
+    const assignmentPayload =
       {
-        questionId: "q1",
-        text: `Analyze the foundational characteristics of: ${additionalInfo || "General Syllabus Spec"}`,
-        type: "subjective",
-        points: Math.round(marks / numberOfQuestions) || 5
-      }
-    ];
+        userId:
+          userId || null,
+        createdBy:
+          createdBy ||
+          "Aryan Panwar",
+        creatorEmail:
+          creatorEmail ||
+          "",
+        additionalInfo:
+          additionalInfo,
+        status:
+          "completed",
+        createdAt:
+          new Date(),
+        config: {
+          numberOfQuestions,
+          marks,
+          dueDate:
+            "Inline Generation",
+        },
+        questions:
+          generatedQuestions,
+      };
 
-    // Build the canonical database-ready JSON document payload architecture
-    const assignmentPayload = {
-      userId: userId || null,
-      createdBy: createdBy || "Aryan panwar",
-      creatorEmail: creatorEmail || "",
-      additionalInfo: additionalInfo || "General Syllabus Evaluation Blueprint",
-      status: "completed",
-      createdAt: new Date(),
-      config: {
-        numberOfQuestions: numberOfQuestions,
-        marks: marks,
-        dueDate: "Inline Generation"
-      },
-      questions: generatedQuestionsMock
-    };
+    if (
+      mongoose.connection
+        .readyState >= 1
+    ) {
+      const AssignmentModel =
+        mongoose.models
+          .Assignment ||
+        mongoose.model(
+          "Assignment",
+          new mongoose.Schema(
+            {},
+            {
+              strict: false,
+            }
+          )
+        );
 
-    // =========================================================================
-    // PERSISTENCE BLOCK WITH DEFENSIVE VOLATILE MEMORY FALLBACK
-    // =========================================================================
-    // Check if Mongoose is explicitly connected to an active operational pool database instance
-    if (mongoose.connection.readyState >= 1) {
-      try {
-        // Dynamically get the model to prevent initialization layout races
-        const AssignmentModel = mongoose.models.Assignment || mongoose.model("Assignment", new mongoose.Schema({}, { strict: false }));
-        
-        const savedDocument = await AssignmentModel.create(assignmentPayload);
-        console.log(`💾 [PERSISTENCE SUCCESS]: Saved document entry under ID: ${savedDocument._id}`);
-      } catch (dbWriteError) {
-        console.error("❌ [PERSISTENCE ERROR]: Could not write document item to collection:", dbWriteError);
-      }
-    } else {
-      // 🛠️ COGNIZANT FALLBACK: Print compilation payload safely to process logs instead of dropping thread execution
-      console.log("\n======================================================================");
-      console.log("📋 [VOLATILE MEMORY MODE - GENERATION OUTPUT]:");
-      console.log(JSON.stringify(assignmentPayload, null, 2));
-      console.log("ℹ️  Skipping MongoDB document write — Database connection is inactive.");
-      console.log("======================================================================\n");
+      const saved =
+        await AssignmentModel.create(
+          assignmentPayload
+        );
+
+      console.log(
+        "✅ Assignment Saved:",
+        saved._id
+      );
     }
 
-    // =========================================================================
-    // REALT-TIME WEBSOCKET RE-BROADCAST INSTANCE INTERACTION STREAM
-    // =========================================================================
-    // Execute live event pushes directly exactly as configured in your functional architecture
-    console.log("📡 [WEBSOCKET BROADCAST]: Emitting payload update token instance to UI frame layers...");
-    
-    // Example hook call structure for your live system sockets emitter:
-    // io.emit(`assignment_${userId || 'global'}`, { status: "completed", data: assignmentPayload });
+    return {
+      success: true,
+      payload:
+        assignmentPayload,
+    };
+  } catch (error) {
+    console.error(
+      "❌ Worker failed:",
+      error
+    );
 
-    return { success: true, payload: assignmentPayload };
-
-  } catch (processError) {
-    console.error("❌ [WORKER PIPELINE CRASH]: Critical failure executing generation parameters:", processError);
-    throw processError;
+    throw error;
   }
 }
+
+// =======================================================
+// ACTUAL BULLMQ WORKER
+// =======================================================
+new Worker(
+  "assignment-generation",
+  async (job) => {
+    return processAssignmentGeneration(
+      job
+    );
+  },
+  {
+    connection:
+      redisConnection,
+  }
+);
+
+console.log(
+  "👷 Assignment Worker Running"
+);
