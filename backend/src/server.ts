@@ -1,48 +1,118 @@
 import dotenv from "dotenv";
-// Force environment variables to initialize at the absolute top of the stack
+
+// Load environment variables first
 dotenv.config();
 
 import express from "express";
 import http from "http";
 import cors from "cors";
 import mongoose from "mongoose";
+
 import assignmentRoutes from "./routes/assignment.routes";
 import { initializeWebSocketServer } from "./sockets/websocket.handler";
 
-// Explicitly import the worker thread to bind BullMQ to the process on boot
-import "./workers/assignment.worker"; 
+// Load BullMQ worker on server startup
+import "./workers/assignment.worker";
 
 const app = express();
 const server = http.createServer(app);
 
-// 1. Comprehensive CORS policy to completely avoid frontend "Failed to Fetch" issues
-app.use(cors({
-  origin: "http://localhost:3000",
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true
-}));
+// =========================================================
+// Environment Variables
+// =========================================================
+const PORT = process.env.PORT || 8080;
 
-// Instantly intercept and approve browser OPTIONS preflight checks
+const CLIENT_URL =
+  process.env.CLIENT_URL ||
+  "http://localhost:3000";
+
+// =========================================================
+// CORS Configuration
+// =========================================================
+app.use(
+  cors({
+    origin: CLIENT_URL,
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "DELETE",
+      "OPTIONS",
+    ],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+    ],
+    credentials: true,
+  })
+);
+
+// Handle browser preflight requests
 app.options("*", cors() as any);
 
+// =========================================================
+// Middleware
+// =========================================================
 app.use(express.json());
 
-// 2. Attach the assignment router under the standard /api prefix
+// =========================================================
+// Routes
+// =========================================================
 app.use("/api", assignmentRoutes);
 
-// 3. Mount the real-time WebSocket messaging layer onto the HTTP server instance
+// Health Route
+// Helps Render verify deployment
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    success: true,
+    message:
+      "AI Assessment Generator API running",
+  });
+});
+
+// =========================================================
+// WebSocket Initialization
+// =========================================================
 initializeWebSocketServer(server);
 
-const PORT = 8080;
-const HOST = "127.0.0.1";
+// =========================================================
+// Server Bootstrap
+// =========================================================
+const startServer = async () => {
+  try {
+    // MongoDB connection only if URI exists
+    if (process.env.MONGO_URI) {
+      await mongoose.connect(
+        process.env.MONGO_URI
+      );
 
-mongoose.connect(process.env.MONGO_URI || "mongodb://127.0.0.1:27017/vedaai")
-  .then(() => {
-    server.listen(PORT, HOST, () => {
-      console.log(`Server executing active tasks on Port ${PORT}`);
+      console.log(
+        "✅ MongoDB connected"
+      );
+    } else {
+      console.warn(
+        "⚠️ MONGO_URI missing. Continuing without database."
+      );
+    }
+
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(
+        `🚀 Server running on port ${PORT}`
+      );
     });
-  })
-  .catch((err) => {
-    console.error("Critical full-stack database initialization exception:", err);
-  });
+  } catch (error) {
+    console.error(
+      "❌ MongoDB connection failed:",
+      error
+    );
+
+    // Still boot server for deployment
+    server.listen(PORT, "0.0.0.0", () => {
+      console.log(
+        `🚀 Server running on port ${PORT}`
+      );
+    });
+  }
+};
+
+startServer();
