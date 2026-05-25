@@ -143,7 +143,7 @@ export default function AssignmentPreviewCanvasPage({ params }: PageProps) {
               </div>
 
               <div className="space-y-3">
-                {section.questions?.map((question: any, qIdx: number) => (
+                {section.generatedContent?.questions?.map((question: any, qIdx: number) => (
                   <div key={qIdx} className="flex items-start justify-between gap-6 p-2 hover:bg-white rounded-xl border border-transparent hover:border-neutral-100 transition-all group print:border-0 print:p-1">
                     <div className="space-y-1">
                       <div className="text-xs font-semibold text-neutral-800 leading-relaxed print:text-sm">
