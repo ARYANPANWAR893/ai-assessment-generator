@@ -1,26 +1,42 @@
 import { Queue } from "bullmq";
 import IORedis from "ioredis";
 
-// Production-safe Redis connection
+// Create stable Redis connection
 export const redisConnection =
-  process.env.REDIS_URL
-    ? new IORedis(process.env.REDIS_URL, {
-        maxRetriesPerRequest: null,
-        enableReadyCheck: false,
-        lazyConnect: true,
-        connectTimeout: 10000,
-        retryStrategy(times) {
-          return Math.min(times * 50, 2000);
-        },
-      })
-    : new IORedis(
-        "redis://127.0.0.1:6379",
-        {
-          maxRetriesPerRequest: null,
-        }
-      );
+  new IORedis(
+    process.env.REDIS_URL!,
+    {
+      maxRetriesPerRequest:
+        null,
 
-// Queue
+      enableReadyCheck:
+        false,
+
+      lazyConnect:
+        false,
+
+      keepAlive:
+        30000,
+
+      connectTimeout:
+        10000,
+
+      retryStrategy(
+        times
+      ) {
+        return Math.min(
+          times * 50,
+          2000
+        );
+      },
+
+      reconnectOnError() {
+        return true;
+      },
+    }
+  );
+
+// Queue instance
 export const assignmentQueue =
   new Queue(
     "assignment-generation",
@@ -30,12 +46,30 @@ export const assignmentQueue =
     }
   );
 
-// Helpful logs
+// Logging
 redisConnection.on(
   "connect",
   () => {
     console.log(
       "✅ Redis connected"
+    );
+  }
+);
+
+redisConnection.on(
+  "ready",
+  () => {
+    console.log(
+      "🚀 Redis ready"
+    );
+  }
+);
+
+redisConnection.on(
+  "reconnecting",
+  () => {
+    console.log(
+      "♻️ Redis reconnecting..."
     );
   }
 );
