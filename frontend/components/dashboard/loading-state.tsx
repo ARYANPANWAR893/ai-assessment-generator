@@ -15,7 +15,7 @@ export function LoadingStateDisplay({ assignmentId }: { assignmentId: string }) 
             return;
         }
 
-        const ws = new WebSocket(`ws://localhost:8080?assignmentId=${assignmentId}`);
+        const ws = new WebSocket(`ws://ai-assessment-generator.onrender.com?assignmentId=${assignmentId}`);
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
@@ -28,7 +28,7 @@ export function LoadingStateDisplay({ assignmentId }: { assignmentId: string }) 
 
         const safetyPoll = setInterval(async () => {
             try {
-                const res = await fetch(`http://localhost:8080/api/assignments/${assignmentId}`);
+                const res = await fetch(`https://ai-assessment-generator.onrender.com/api/assignments/${assignmentId}`);
                 if (!res.ok) return; // Prevent parsing errors on un-synced collection nodes
 
                 const data = await res.json();

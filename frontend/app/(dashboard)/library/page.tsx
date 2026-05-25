@@ -11,7 +11,7 @@ export default function LibraryArchiveView() {
   const router = useRouter();
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8080/api/assignments-list")
+    fetch("https://ai-assessment-generator.onrender.com/api/assignments-list")
       .then((res) => res.ok ? res.json() : [])
       .then((data) => {
         setItems(data);

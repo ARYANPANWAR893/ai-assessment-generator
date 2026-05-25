@@ -12,7 +12,7 @@ export default function HomeDashboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8080/api/assignments-list")
+    fetch("https://ai-assessment-generator.onrender.com/api/assignments-list")
       .then((res) => res.ok ? res.json() : [])
       .then((data) => {
         setRecentItems(data.slice(0, 3)); 

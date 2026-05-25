@@ -18,7 +18,7 @@ export default function AssignmentPreviewCanvasPage({ params }: PageProps) {
 
   const fetchAssignmentData = async () => {
     try {
-      const res = await fetch(`http://127.0.0.1:8080/api/assignments/${assignmentId}`);
+      const res = await fetch(`https://ai-assessment-generator.onrender.com/api/assignments/${assignmentId}`);
       if (res.ok) {
         const data = await res.json();
         setAssignment(data);
@@ -39,7 +39,7 @@ export default function AssignmentPreviewCanvasPage({ params }: PageProps) {
   const handleRegenerateAction = async () => {
     setIsRegenerating(true);
     try {
-      const res = await fetch(`http://127.0.0.1:8080/api/assignments/${assignmentId}/regenerate`, {
+      const res = await fetch(`https://ai-assessment-generator.onrender.com/api/assignments/${assignmentId}/regenerate`, {
         method: "POST"
       });
       if (res.ok) {

@@ -7,7 +7,7 @@ export function DocumentPreviewCanvas({ assignmentId }: { assignmentId: string }
   const [paper, setPaper] = useState<any>(null);
 
   useEffect(() => {
-    fetch(`http://localhost:8080/api/assignments/${assignmentId}`)
+    fetch(`https://ai-assessment-generator.onrender.com/api/assignments/${assignmentId}`)
       .then(res => res.json())
       .then(data => {
         if (data.generatedPaper) setPaper(data.generatedPaper);

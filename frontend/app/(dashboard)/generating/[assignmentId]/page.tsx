@@ -21,7 +21,7 @@ export default function AssignmentGenerationLoadingScreen({ params }: PageProps)
     if (!assignmentId) return;
 
     // Connect directly to backend protocol socket binding using explicit IPv4 loopback
-    const socket = new WebSocket(`ws://127.0.0.1:8080?assignmentId=${assignmentId}`);
+    const socket = new WebSocket(`ws://ai-assessment-generator.onrender.com?assignmentId=${assignmentId}`);
 
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data);
@@ -41,7 +41,7 @@ export default function AssignmentGenerationLoadingScreen({ params }: PageProps)
     // Lightweight HTTP Polling Fallback to handle routing safely if WebSockets disconnect
     const safetyPollingInterval = setInterval(async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:8080/api/assignments/${assignmentId}`);
+        const res = await fetch(`https://ai-assessment-generator.onrender.com/api/assignments/${assignmentId}`);
         if (res.ok) {
           const data = await res.json();
           if (data.status === "completed") {

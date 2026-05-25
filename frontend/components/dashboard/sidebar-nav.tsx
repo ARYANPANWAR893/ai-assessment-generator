@@ -11,7 +11,7 @@ export function SidebarNav() {
 
   // ✅ Automatically pulls active count metrics from your database array
   useEffect(() => {
-    fetch("http://127.0.0.1:8080/api/assignments-list")
+    fetch("https://ai-assessment-generator.onrender.com/api/assignments-list")
       .then((res) => res.ok ? res.json() : [])
       .then((data) => setAssignmentCount(data.length))
       .catch(() => setAssignmentCount(0));
