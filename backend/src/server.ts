@@ -11,7 +11,7 @@ import mongoose from "mongoose";
 import assignmentRoutes from "./routes/assignment.routes";
 import { initializeWebSocketServer } from "./sockets/websocket.handler";
 
-// Load BullMQ worker on server startup
+// Start BullMQ worker on boot
 import "./workers/assignment.worker";
 
 const app = express();
@@ -26,8 +26,12 @@ const CLIENT_URL =
   process.env.CLIENT_URL ||
   "http://localhost:3000";
 
+const MONGO_URI =
+  process.env.MONGO_URI ||
+  process.env.MONGODB_URI;
+
 // =========================================================
-// CORS Configuration
+// Middleware
 // =========================================================
 app.use(
   cors({
@@ -47,12 +51,8 @@ app.use(
   })
 );
 
-// Handle browser preflight requests
 app.options("*", cors() as any);
 
-// =========================================================
-// Middleware
-// =========================================================
 app.use(express.json());
 
 // =========================================================
@@ -60,8 +60,7 @@ app.use(express.json());
 // =========================================================
 app.use("/api", assignmentRoutes);
 
-// Health Route
-// Helps Render verify deployment
+// Health Check Route
 app.get("/", (_req, res) => {
   res.status(200).json({
     success: true,
@@ -76,42 +75,73 @@ app.get("/", (_req, res) => {
 initializeWebSocketServer(server);
 
 // =========================================================
-// Server Bootstrap
+// Server Startup
 // =========================================================
 const startServer = async () => {
   try {
-    // MongoDB connection only if URI exists
-    if (process.env.MONGO_URI) {
+    console.log(
+      "🚀 Booting AI Assessment Generator..."
+    );
+
+    // Check env var exists
+    if (!MONGO_URI) {
+      console.warn(
+        "⚠️ No Mongo URI found. Starting without database."
+      );
+    } else {
+      console.log(
+        "🔌 Connecting to MongoDB..."
+      );
+
       await mongoose.connect(
-        process.env.MONGO_URI
+        MONGO_URI
       );
 
       console.log(
         "✅ MongoDB connected"
       );
-    } else {
-      console.warn(
-        "⚠️ MONGO_URI missing. Continuing without database."
-      );
     }
 
-    server.listen(PORT, "0.0.0.0", () => {
-      console.log(
-        `🚀 Server running on port ${PORT}`
-      );
-    });
-  } catch (error) {
+    server.listen(
+      Number(PORT),
+      "0.0.0.0",
+      () => {
+        console.log(
+          `🚀 Server running on port ${PORT}`
+        );
+
+        console.log(
+          `🌍 Allowed frontend origin: ${CLIENT_URL}`
+        );
+      }
+    );
+  } catch (error: any) {
     console.error(
-      "❌ MongoDB connection failed:",
-      error
+      "❌ MongoDB connection failed"
     );
 
-    // Still boot server for deployment
-    server.listen(PORT, "0.0.0.0", () => {
-      console.log(
-        `🚀 Server running on port ${PORT}`
-      );
-    });
+    console.error(
+      "Mongo error message:"
+    );
+    console.error(
+      error?.message
+    );
+
+    console.error(
+      "Full Mongo error:"
+    );
+    console.error(error);
+
+    // Start server anyway
+    server.listen(
+      Number(PORT),
+      "0.0.0.0",
+      () => {
+        console.log(
+          `🚀 Server running on port ${PORT}`
+        );
+      }
+    );
   }
 };
 
