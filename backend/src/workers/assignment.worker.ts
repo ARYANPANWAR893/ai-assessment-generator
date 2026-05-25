@@ -1,10 +1,7 @@
 import mongoose from "mongoose";
 import { Worker } from "bullmq";
 import { connectDB } from "../lib/db";
-
-// CHANGE THIS IMPORT PATH IF NEEDED
-// Search for: export const redisConnection
-import { redisConnection } from "../config/redis";
+import { redisConnection } from "../queue";
 
 interface GenerationJobPayload {
   userId?: string;
@@ -36,48 +33,72 @@ async function processAssignmentGeneration(
     }`
   );
 
+  // Ensure DB connection
   await connectDB();
 
   try {
+    // Mock AI generation
     const generatedQuestions = Array.from(
-      { length: numberOfQuestions || 1 },
+      {
+        length:
+          numberOfQuestions || 1,
+      },
       (_, index) => ({
-        questionId: `q${index + 1}`,
-        text: `Question ${index + 1}: ${
-          additionalInfo || "General Topic"
+        questionId: `q${
+          index + 1
         }`,
-        type: "subjective",
+        text: `Question ${
+          index + 1
+        }: ${
+          additionalInfo ||
+          "General Topic"
+        }`,
+        type:
+          "subjective",
         points:
           Math.round(
-            marks / numberOfQuestions
+            marks /
+              numberOfQuestions
           ) || 5,
       })
     );
 
-    const assignmentPayload = {
-      userId: userId || null,
-      createdBy:
-        createdBy || "Aryan Panwar",
-      creatorEmail:
-        creatorEmail || "",
-      additionalInfo:
-        additionalInfo ||
-        "Generated Assignment",
-      status: "completed",
-      createdAt: new Date(),
+    // Assignment document
+    const assignmentPayload =
+      {
+        userId:
+          userId || null,
 
-      config: {
-        numberOfQuestions,
-        marks,
-        dueDate:
-          "Inline Generation",
-      },
+        createdBy:
+          createdBy ||
+          "Aryan Panwar",
 
-      questions:
-        generatedQuestions,
-    };
+        creatorEmail:
+          creatorEmail ||
+          "",
 
-    // Save to Mongo
+        additionalInfo:
+          additionalInfo ||
+          "Generated Assignment",
+
+        status:
+          "completed",
+
+        createdAt:
+          new Date(),
+
+        config: {
+          numberOfQuestions,
+          marks,
+          dueDate:
+            "Inline Generation",
+        },
+
+        questions:
+          generatedQuestions,
+      };
+
+    // Save to MongoDB
     if (
       mongoose.connection
         .readyState >= 1
@@ -105,12 +126,12 @@ async function processAssignmentGeneration(
       );
     } else {
       console.warn(
-        "⚠️ Mongo not connected"
+        "⚠️ MongoDB not connected"
       );
     }
 
     console.log(
-      "📡 Generation complete"
+      "📡 Generation completed"
     );
 
     return {
@@ -129,7 +150,7 @@ async function processAssignmentGeneration(
 }
 
 // =======================================================
-// BullMQ Worker Instance
+// BullMQ Worker
 // =======================================================
 const worker = new Worker(
   "assignment-generation",
@@ -144,6 +165,7 @@ const worker = new Worker(
   }
 );
 
+// Success logs
 worker.on(
   "completed",
   (job) => {
@@ -153,6 +175,7 @@ worker.on(
   }
 );
 
+// Failure logs
 worker.on(
   "failed",
   (job, err) => {
