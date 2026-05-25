@@ -49,7 +49,7 @@ export default function AssignmentsArchiveView() {
       evaluatedMatchStatus: isOwner
     });
 
-    return matchesSearch && isOwner;
+    return matchesSearch;
   });
 
   if (loading) {

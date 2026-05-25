@@ -85,7 +85,7 @@ export function AssignmentCreatorForm() {
         // Clear local file states before pushing page routing changes
         setSelectedFile(null);
         setFilePreviewUrl(null);
-        router.push(`/generating/${data.assignmentId}`);
+        router.push(`/assessment/${data.assignmentId}`);
       }
     } catch (err) {
       console.error("Critical submission flow exception:", err);

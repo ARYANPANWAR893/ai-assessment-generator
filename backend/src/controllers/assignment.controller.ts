@@ -3,8 +3,9 @@ import { Assignment } from "../models/assignment.model";
 import { processAssignmentGeneration } from "../workers/assignment.worker";
 
 /**
- * Create Assignment
- * Direct execution mode (BullMQ bypassed for deployment stability)
+ * ==========================================================
+ * CREATE ASSIGNMENT
+ * ==========================================================
  */
 export const createAssignmentTask =
   async (
@@ -20,11 +21,6 @@ export const createAssignmentTask =
         numberOfQuestions,
       } = req.body;
 
-      const uploadedFile =
-        req.file
-          ? req.file.path
-          : undefined;
-
       const parsedQuestionRows =
         typeof questionRows ===
         "string"
@@ -33,7 +29,7 @@ export const createAssignmentTask =
             )
           : questionRows;
 
-      // Create queued assignment
+      // Create initial assignment
       const newAssignment =
         await Assignment.create(
           {
@@ -45,9 +41,9 @@ export const createAssignmentTask =
               parsedQuestionRows,
 
             status:
-              "queued",
+              "generating",
 
-            progress: 10,
+            progress: 25,
 
             config: {
               dueDate:
@@ -80,9 +76,9 @@ export const createAssignmentTask =
         `🚀 Direct generation started: ${assignmentId}`
       );
 
-      // ==================================================
-      // DIRECT WORKER EXECUTION (NO REDIS)
-      // ==================================================
+      // ==========================================
+      // DIRECT GENERATION
+      // ==========================================
       const generatedResult =
         await processAssignmentGeneration(
           {
@@ -113,7 +109,9 @@ export const createAssignmentTask =
           }
         );
 
-      // Update saved assignment
+      // ==========================================
+      // UPDATE EXISTING ASSIGNMENT
+      // ==========================================
       await Assignment.findByIdAndUpdate(
         assignmentId,
         {
@@ -122,10 +120,13 @@ export const createAssignmentTask =
 
           progress: 100,
 
-          questions:
-            generatedResult
-              .payload
-              .questions,
+          generatedContent:
+            {
+              questions:
+                generatedResult
+                  .payload
+                  .questions,
+            },
         }
       );
 
@@ -134,8 +135,6 @@ export const createAssignmentTask =
         .json({
           success: true,
           assignmentId,
-          data:
-            generatedResult.payload,
         });
     } catch (error) {
       console.error(
@@ -153,7 +152,9 @@ export const createAssignmentTask =
   };
 
 /**
- * Get Assignment
+ * ==========================================================
+ * GET ASSIGNMENT
+ * ==========================================================
  */
 export const getAssignment =
   async (
@@ -210,7 +211,9 @@ export const getAssignment =
   };
 
 /**
- * Regenerate Assignment
+ * ==========================================================
+ * REGENERATE ASSIGNMENT
+ * ==========================================================
  */
 export const triggerRegenerationRequest =
   async (
@@ -239,8 +242,9 @@ export const triggerRegenerationRequest =
         id,
         {
           status:
-            "queued",
-          progress: 10,
+            "generating",
+
+          progress: 30,
         }
       );
 
@@ -278,9 +282,13 @@ export const triggerRegenerationRequest =
 
           progress: 100,
 
-          questions:
-            result.payload
-              .questions,
+          generatedContent:
+            {
+              questions:
+                result
+                  .payload
+                  .questions,
+            },
         }
       );
 
