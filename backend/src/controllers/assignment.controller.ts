@@ -3,9 +3,7 @@ import { Assignment } from "../models/assignment.model";
 import { processAssignmentGeneration } from "../workers/assignment.worker";
 
 /**
- * ==========================================================
  * CREATE ASSIGNMENT
- * ==========================================================
  */
 export const createAssignmentTask =
   async (
@@ -29,7 +27,7 @@ export const createAssignmentTask =
             )
           : questionRows;
 
-      // Create initial assignment
+      // Create assignment
       const newAssignment =
         await Assignment.create(
           {
@@ -76,9 +74,9 @@ export const createAssignmentTask =
         `🚀 Direct generation started: ${assignmentId}`
       );
 
-      // ==========================================
-      // DIRECT GENERATION
-      // ==========================================
+      // ==================================
+      // GENERATE CONTENT
+      // ==================================
       const generatedResult =
         await processAssignmentGeneration(
           {
@@ -96,22 +94,13 @@ export const createAssignmentTask =
               additionalInfo:
                 additionalInfo ||
                 "",
-
-              userId:
-                assignmentId,
-
-              createdBy:
-                "Aryan Panwar",
-
-              creatorEmail:
-                "",
             },
           }
         );
 
-      // ==========================================
-      // UPDATE EXISTING ASSIGNMENT
-      // ==========================================
+      // ==================================
+      // SAVE GENERATED CONTENT
+      // ==================================
       await Assignment.findByIdAndUpdate(
         assignmentId,
         {
@@ -121,12 +110,9 @@ export const createAssignmentTask =
           progress: 100,
 
           generatedContent:
-            {
-              questions:
-                generatedResult
-                  .payload
-                  .questions,
-            },
+            generatedResult
+              .payload
+              .generatedContent,
         }
       );
 
@@ -152,50 +138,36 @@ export const createAssignmentTask =
   };
 
 /**
- * ==========================================================
  * GET ASSIGNMENT
- * ==========================================================
  */
 export const getAssignment =
   async (
     req: Request,
     res: Response
   ) => {
-    const { id } =
-      req.params;
-
-    if (
-      !id ||
-      id ===
-        "undefined" ||
-      id.length !== 24
-    ) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Invalid assignment id.",
-        });
-    }
-
     try {
-      const item =
+      const { id } =
+        req.params;
+
+      const assignment =
         await Assignment.findById(
           id
         );
 
-      if (!item) {
+      if (!assignment) {
         return res
           .status(404)
           .json({
             error:
-              "Assignment not found.",
+              "Assignment not found",
           });
       }
 
       return res
         .status(200)
-        .json(item);
+        .json(
+          assignment
+        );
     } catch (error) {
       console.error(
         error
@@ -205,15 +177,13 @@ export const getAssignment =
         .status(500)
         .json({
           error:
-            "Failed to fetch assignment.",
+            "Failed to fetch assignment",
         });
     }
   };
 
 /**
- * ==========================================================
  * REGENERATE ASSIGNMENT
- * ==========================================================
  */
 export const triggerRegenerationRequest =
   async (
@@ -234,19 +204,9 @@ export const triggerRegenerationRequest =
           .status(404)
           .json({
             error:
-              "Assignment not found.",
+              "Assignment not found",
           });
       }
-
-      await Assignment.findByIdAndUpdate(
-        id,
-        {
-          status:
-            "generating",
-
-          progress: 30,
-        }
-      );
 
       const result =
         await processAssignmentGeneration(
@@ -267,9 +227,6 @@ export const triggerRegenerationRequest =
               additionalInfo:
                 record.additionalInfo ||
                 "",
-
-              userId:
-                id,
             },
           }
         );
@@ -283,12 +240,9 @@ export const triggerRegenerationRequest =
           progress: 100,
 
           generatedContent:
-            {
-              questions:
-                result
-                  .payload
-                  .questions,
-            },
+            result
+              .payload
+              .generatedContent,
         }
       );
 
@@ -299,16 +253,16 @@ export const triggerRegenerationRequest =
           assignmentId:
             id,
         });
-    } catch (err) {
+    } catch (error) {
       console.error(
-        err
+        error
       );
 
       return res
         .status(500)
         .json({
           error:
-            "Regeneration failed.",
+            "Regeneration failed",
         });
     }
   };

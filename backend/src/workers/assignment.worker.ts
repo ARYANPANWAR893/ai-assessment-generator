@@ -1,7 +1,6 @@
-import mongoose from "mongoose";
 import { Worker } from "bullmq";
 import { connectDB } from "../lib/db";
-import { redisConnection } from "../queue/assignment.queue";
+import { redisConnection } from "../queue";
 
 interface GenerationJobPayload {
   userId?: string;
@@ -12,14 +11,6 @@ interface GenerationJobPayload {
   additionalInfo: string;
 }
 
-/**
- * ==========================================================
- * MAIN GENERATION FUNCTION
- * ==========================================================
- * Used by:
- * 1. Direct controller execution (production fallback)
- * 2. BullMQ worker queue
- */
 export async function processAssignmentGeneration(
   job: {
     data: GenerationJobPayload;
@@ -29,128 +20,78 @@ export async function processAssignmentGeneration(
     numberOfQuestions,
     marks,
     additionalInfo,
-    userId,
-    createdBy,
-    creatorEmail,
   } = job.data;
 
   console.log(
-    `🚀 [WORKER START] Processing assignment: ${
-      additionalInfo || "Untitled"
-    }`
+    `🚀 [WORKER START] ${additionalInfo}`
   );
 
   await connectDB();
 
   try {
-    // ==================================================
-    // Mock Question Generation Logic
-    // ==================================================
+    // ======================================
+    // GENERATED QUESTIONS
+    // ======================================
     const generatedQuestions =
       Array.from(
         {
           length:
-            numberOfQuestions || 1,
+            numberOfQuestions || 10,
         },
         (_, index) => ({
-          questionId: `q${
+          id: index + 1,
+
+          question: `Question ${
             index + 1
-          }`,
-          text: `Question ${
-            index + 1
-          }: ${
+          } about ${
             additionalInfo ||
             "General Topic"
           }`,
-          type:
-            "subjective",
-          points:
-            Math.round(
+
+          marks:
+            Math.ceil(
               marks /
                 numberOfQuestions
-            ) || 5,
+            ),
+
+          type:
+            index < 3
+              ? "MCQ"
+              : index < 6
+              ? "Short Answer"
+              : "Long Answer",
         })
       );
 
-    // ==================================================
-    // Assignment Document
-    // ==================================================
-    const assignmentPayload =
+    // ======================================
+    // FINAL CONTENT PAYLOAD
+    // ======================================
+    const generatedContent =
       {
-        userId:
-          userId || null,
-
-        createdBy:
-          createdBy ||
-          "Aryan Panwar",
-
-        creatorEmail:
-          creatorEmail ||
-          "",
-
-        additionalInfo:
+        title:
           additionalInfo ||
           "Generated Assignment",
 
-        status:
-          "completed",
-
-        createdAt:
-          new Date(),
-
-        config: {
+        totalQuestions:
           numberOfQuestions,
+
+        totalMarks:
           marks,
-          dueDate:
-            "Inline Generation",
-        },
 
         questions:
           generatedQuestions,
       };
 
-    // ==================================================
-    // Save to MongoDB
-    // ==================================================
-    if (
-      mongoose.connection
-        .readyState >= 1
-    ) {
-      const AssignmentModel =
-        mongoose.models
-          .Assignment ||
-        mongoose.model(
-          "Assignment",
-          new mongoose.Schema(
-            {},
-            {
-              strict: false,
-            }
-          )
-        );
-
-      const savedDocument =
-        await AssignmentModel.create(
-          assignmentPayload
-        );
-
-      console.log(
-        `✅ Assignment saved: ${savedDocument._id}`
-      );
-    } else {
-      console.warn(
-        "⚠️ MongoDB not connected"
-      );
-    }
-
     console.log(
-      "📡 Generation completed"
+      "✅ Content generated"
     );
 
     return {
       success: true,
-      payload:
-        assignmentPayload,
+
+      payload: {
+        generatedContent,
+      },
     };
   } catch (error) {
     console.error(
@@ -162,12 +103,9 @@ export async function processAssignmentGeneration(
   }
 }
 
-/**
- * ==========================================================
- * BullMQ Worker
- * ==========================================================
- * Still preserved for architecture completeness
- */
+// ======================================
+// BULLMQ WORKER (KEPT FOR COMPATIBILITY)
+// ======================================
 const worker = new Worker(
   "assignment-generation",
   async (job) => {
@@ -181,22 +119,20 @@ const worker = new Worker(
   }
 );
 
-// Worker Success Logs
 worker.on(
   "completed",
   (job) => {
     console.log(
-      `✅ Job completed: ${job.id}`
+      `✅ Job completed ${job.id}`
     );
   }
 );
 
-// Worker Failure Logs
 worker.on(
   "failed",
   (job, err) => {
     console.error(
-      `❌ Job failed: ${job?.id}`,
+      `❌ Job failed ${job?.id}`,
       err
     );
   }
