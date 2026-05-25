@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { Worker } from "bullmq";
 import { connectDB } from "../lib/db";
-import { redisConnection } from "../queue/assignment.queue";
+import { redisConnection } from "../queue";
 
 interface GenerationJobPayload {
   userId?: string;
@@ -12,11 +12,18 @@ interface GenerationJobPayload {
   additionalInfo: string;
 }
 
-// =======================================================
-// Assignment Generation Logic
-// =======================================================
-async function processAssignmentGeneration(
-  job: { data: GenerationJobPayload }
+/**
+ * ==========================================================
+ * MAIN GENERATION FUNCTION
+ * ==========================================================
+ * Used by:
+ * 1. Direct controller execution (production fallback)
+ * 2. BullMQ worker queue
+ */
+export async function processAssignmentGeneration(
+  job: {
+    data: GenerationJobPayload;
+  }
 ) {
   const {
     numberOfQuestions,
@@ -33,37 +40,41 @@ async function processAssignmentGeneration(
     }`
   );
 
-  // Ensure DB connection
   await connectDB();
 
   try {
-    // Mock AI generation
-    const generatedQuestions = Array.from(
-      {
-        length:
-          numberOfQuestions || 1,
-      },
-      (_, index) => ({
-        questionId: `q${
-          index + 1
-        }`,
-        text: `Question ${
-          index + 1
-        }: ${
-          additionalInfo ||
-          "General Topic"
-        }`,
-        type:
-          "subjective",
-        points:
-          Math.round(
-            marks /
-              numberOfQuestions
-          ) || 5,
-      })
-    );
+    // ==================================================
+    // Mock Question Generation Logic
+    // ==================================================
+    const generatedQuestions =
+      Array.from(
+        {
+          length:
+            numberOfQuestions || 1,
+        },
+        (_, index) => ({
+          questionId: `q${
+            index + 1
+          }`,
+          text: `Question ${
+            index + 1
+          }: ${
+            additionalInfo ||
+            "General Topic"
+          }`,
+          type:
+            "subjective",
+          points:
+            Math.round(
+              marks /
+                numberOfQuestions
+            ) || 5,
+        })
+      );
 
-    // Assignment document
+    // ==================================================
+    // Assignment Document
+    // ==================================================
     const assignmentPayload =
       {
         userId:
@@ -98,7 +109,9 @@ async function processAssignmentGeneration(
           generatedQuestions,
       };
 
+    // ==================================================
     // Save to MongoDB
+    // ==================================================
     if (
       mongoose.connection
         .readyState >= 1
@@ -149,14 +162,17 @@ async function processAssignmentGeneration(
   }
 }
 
-// =======================================================
-// BullMQ Worker
-// =======================================================
+/**
+ * ==========================================================
+ * BullMQ Worker
+ * ==========================================================
+ * Still preserved for architecture completeness
+ */
 const worker = new Worker(
   "assignment-generation",
   async (job) => {
     return processAssignmentGeneration(
-      job
+      job as any
     );
   },
   {
@@ -165,7 +181,7 @@ const worker = new Worker(
   }
 );
 
-// Success logs
+// Worker Success Logs
 worker.on(
   "completed",
   (job) => {
@@ -175,7 +191,7 @@ worker.on(
   }
 );
 
-// Failure logs
+// Worker Failure Logs
 worker.on(
   "failed",
   (job, err) => {
