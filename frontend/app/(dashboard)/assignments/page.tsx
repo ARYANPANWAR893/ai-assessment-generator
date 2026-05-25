@@ -34,7 +34,7 @@ export default function AssignmentsArchiveView() {
     // 3. Conditional matching evaluation matrices
     const matchesName = item.createdBy === currentUserName || 
                         item.creator === currentUserName ||
-                        item.userId === user?.id;
+                        item.userId === user?.email || item.userId === user?.name
 
     const matchesEmail = currentUserEmail ? (item.creatorEmail === currentUserEmail || item.email === currentUserEmail) : false;
 
