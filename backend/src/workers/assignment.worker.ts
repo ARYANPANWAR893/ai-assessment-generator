@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { Worker } from "bullmq";
 import { connectDB } from "../lib/db";
-import { redisConnection } from "../queue";
+import { redisConnection } from "../queue/assignment.queue";
 
 interface GenerationJobPayload {
   userId?: string;
