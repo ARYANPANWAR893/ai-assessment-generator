@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+@theme {
+  /* This directly binds your custom font variable to Tailwind v4's theme system */
+  --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Base resets for your application canvas framework */
+body {
+  background-color: var(--color-neutral-900);
+  color: var(--color-neutral-800);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Strip default scroll mechanics from the global application viewport shell */
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+@media print {
+  /* Hide the dashboard sidebar, header panels, and outer wrappers */
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Target everything outside your primary center canvas container sheet and suppress visibility */
+  aside, 
+  nav, 
+  header, 
+  footer, 
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Unset bounding scroll bars so the document maps across multiple pages gracefully */
+  main, 
+  div, 
+  .overflow-y-auto {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+  /* Prevent questions from getting weirdly halved horizontally at the bottom of sheets */
+  .print\:page-break-inside-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
