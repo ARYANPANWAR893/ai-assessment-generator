@@ -30,41 +30,114 @@ export async function processAssignmentGeneration(
 
   try {
     // ======================================
-    // GENERATED QUESTIONS
+    // GROQ API CALL
     // ======================================
-    const generatedQuestions =
-      Array.from(
+    const groqResponse =
+      await fetch(
+        "https://api.groq.com/openai/v1/chat/completions",
         {
-          length:
-            numberOfQuestions || 10,
-        },
-        (_, index) => ({
-          id: index + 1,
+          method: "POST",
 
-          question: `Question ${
-            index + 1
-          } about ${
-            additionalInfo ||
-            "General Topic"
-          }`,
+          headers: {
+            "Content-Type":
+              "application/json",
 
-          marks:
-            Math.ceil(
-              marks /
-                numberOfQuestions
-            ),
+            Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          },
 
-          type:
-            index < 3
-              ? "MCQ"
-              : index < 6
-              ? "Short Answer"
-              : "Long Answer",
-        })
+          body: JSON.stringify({
+            model:
+              "llama-3.3-70b-versatile",
+
+            temperature: 0.7,
+
+            messages: [
+              {
+                role: "system",
+                content: `
+You are an expert university professor.
+
+Generate a high-quality structured question paper.
+
+Rules:
+- Create realistic academic questions
+- Questions must be relevant to topic
+- Include a mix of conceptual, short, numerical, and analytical questions
+- Return ONLY JSON
+- No markdown
+- No explanations
+
+Format:
+{
+  "questions": [
+    {
+      "id": 1,
+      "question": "Question text",
+      "marks": 5,
+      "type": "MCQ | Short Answer | Long Answer | Numerical"
+    }
+  ]
+}
+                `,
+              },
+
+              {
+                role: "user",
+                content: `
+Generate a ${numberOfQuestions}-question paper.
+
+Topic:
+${additionalInfo}
+
+Total Marks:
+${marks}
+                `,
+              },
+            ],
+          }),
+        }
       );
 
+    const groqData =
+      await groqResponse.json();
+
+    const rawOutput =
+      groqData
+        ?.choices?.[0]
+        ?.message?.content;
+
+    if (!rawOutput) {
+      throw new Error(
+        "No Groq response received."
+      );
+    }
+
     // ======================================
-    // FINAL CONTENT PAYLOAD
+    // PARSE AI JSON
+    // ======================================
+    let parsed;
+
+    try {
+      parsed =
+        JSON.parse(
+          rawOutput
+        );
+    } catch {
+      console.error(
+        "❌ Failed parsing Groq JSON:",
+        rawOutput
+      );
+
+      throw new Error(
+        "Invalid AI response format."
+      );
+    }
+
+    const generatedQuestions =
+      parsed.questions || [];
+
+    // ======================================
+    // FINAL PAYLOAD
     // ======================================
     const generatedContent =
       {
@@ -104,7 +177,7 @@ export async function processAssignmentGeneration(
 }
 
 // ======================================
-// BULLMQ WORKER (KEPT FOR COMPATIBILITY)
+// BULLMQ WORKER
 // ======================================
 const worker = new Worker(
   "assignment-generation",
